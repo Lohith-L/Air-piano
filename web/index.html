@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pyano - Fullscreen Air Piano</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet" />
+  <style>
+    body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Outfit', sans-serif; color: #fff; }
+    #video { position: fixed; inset: 0; width: 100vw; height: 100vh; object-fit: cover; transform: scaleX(-1); z-index: 1; }
+    #overlay { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 2; pointer-events: none; }
+    
+    .header { position: absolute; top: 0; left: 0; width: 100vw; padding: 25px 35px; box-sizing: border-box; display: flex; justify-content: space-between; align-items: flex-start; z-index: 20; pointer-events: none; }
+    .header > * { pointer-events: auto; }
+    .logo { font-size: 2.2rem; font-weight: 800; text-shadow: 0 4px 15px rgba(0,0,0,0.9); background: linear-gradient(135deg, #a855f7, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    
+    .panel { background: rgba(15,15,25,0.75); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 18px 24px; display: flex; flex-direction: column; gap: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    
+    .sens-row { display: flex; align-items: center; gap: 12px; font-size: 0.9rem; font-weight: 600; }
+    .sens-row input { accent-color: #a855f7; }
+    .stats { display: flex; gap: 20px; font-size: 0.85rem; color: #ccc; }
+    .stat-val { font-weight: 800; color: #fff; font-size: 1.1rem; }
+    
+    .piano { position: absolute; bottom: 0; left: 0; width: 100vw; height: 35vh; z-index: 10; display: flex; box-shadow: 0 -10px 40px rgba(0,0,0,0.5); }
+    .white-key { flex: 1; background: rgba(255,255,255,0.85); border: 1px solid #222; border-radius: 0 0 10px 10px; position: relative; display: flex; justify-content: center; align-items: flex-end; padding-bottom: 15px; color: #111; font-weight: 800; font-size: 0.9rem; transition: background 0.1s, box-shadow 0.1s; }
+    .black-key { position: absolute; top: 0; width: 4.6vw; height: 62%; background: rgba(20,20,20,0.95); border: 1.5px solid #000; border-radius: 0 0 8px 8px; display: flex; justify-content: center; align-items: flex-end; padding-bottom: 12px; color: #eee; font-weight: 700; font-size: 0.75rem; transform: translateX(-50%); z-index: 11; box-shadow: 0 6px 15px rgba(0,0,0,0.6); transition: background 0.1s, box-shadow 0.1s; }
+    
+    .white-key.hov0 { background: #e9d5ff; }
+    .white-key.hov1 { background: #cffafe; }
+    .black-key.hov0 { background: #5b21b6; }
+    .black-key.hov1 { background: #164e63; }
+    
+    .white-key.press0 { background: #a855f7; color: #fff; box-shadow: inset 0 -8px 20px rgba(0,0,0,0.4); }
+    .white-key.press1 { background: #06b6d4; color: #fff; box-shadow: inset 0 -8px 20px rgba(0,0,0,0.4); }
+    .black-key.press0 { background: #a855f7; color: #fff; }
+    .black-key.press1 { background: #06b6d4; color: #fff; }
+    
+    .start-ov { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; transition: opacity 0.5s; }
+    .start-ov.hidden { opacity: 0; pointer-events: none; }
+    .btn { padding: 16px 45px; font-size: 1.25rem; font-weight: 800; border-radius: 40px; background: linear-gradient(135deg, #a855f7, #06b6d4); color: white; border: none; cursor: pointer; box-shadow: 0 8px 25px rgba(168,85,247,0.5); font-family: 'Outfit', sans-serif; transition: transform 0.2s; }
+    .btn:hover { transform: scale(1.05); }
+    
+    .popup { position: fixed; top: 120px; left: 50%; transform: translateX(-50%); color: #fff; font-size: 2rem; font-weight: 800; padding: 15px 40px; border-radius: 20px; pointer-events: none; opacity: 0; transition: opacity 0.2s; z-index: 100; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+    .popup.h0 { background: linear-gradient(135deg, #7c3aed, #a855f7); }
+    .popup.h1 { background: linear-gradient(135deg, #0891b2, #06b6d4); }
+    .popup.show { opacity: 1; }
+  </style>
+</head>
+<body>
+<div class="start-ov" id="startOv">
+  <div style="font-size: 4rem;">🎹</div>
+  <h1 style="font-size: 2.5rem; margin: 0;">Fullscreen Pyano</h1>
+  <p style="color: #aaa; margin-bottom: 20px;">Play the real piano layout in the air with both hands.</p>
+  <button class="btn" onclick="startCamera()">Enable Camera</button>
+</div>
+
+<video id="video" autoplay playsinline></video>
+<canvas id="overlay"></canvas>
+
+<header class="header">
+  <div class="logo">🎹 Pyano</div>
+  <div class="panel" id="panel" style="display:none">
+    <div class="sens-row">
+      <span>🎛️ Sensitivity</span>
+      <input type="range" id="sensSlider" min="20" max="90" value="55" oninput="SENS=parseInt(this.value); document.getElementById('sVal').innerText=this.value;" />
+      <span id="sVal">55</span>
+    </div>
+    <div class="stats">
+      <div>Notes: <span class="stat-val" id="totalNotes">0</span></div>
+      <div>Hands: <span class="stat-val" id="hCount">0</span></div>
+    </div>
+  </div>
+</header>
+
+<div class="popup" id="popup"></div>
+<div class="piano" id="piano"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script>
+const WHITE_KEYS = [
+  {note:'C3', file:'c3.mp3'}, {note:'D3', file:'d3.mp3'}, {note:'E3', file:'e3.mp3'}, {note:'F3', file:'f3.mp3'},
+  {note:'G3', file:'g3.mp3'}, {note:'A3', file:'a3.mp3'}, {note:'B3', file:'b3.mp3'},
+  {note:'C4', file:'c4.mp3'}, {note:'D4', file:'d4.mp3'}, {note:'E4', file:'e4.mp3'}, {note:'F4', file:'f4.mp3'},
+  {note:'G4', file:'g4.mp3'}, {note:'A4', file:'a4.mp3'}, {note:'B4', file:'b4.mp3'}
+];
+const BLACK_KEYS = [
+  {note:'C#3', file:'c-3.mp3', b: 1}, {note:'D#3', file:'d-3.mp3', b: 2},
+  {note:'F#3', file:'f-3.mp3', b: 4}, {note:'G#3', file:'g-3.mp3', b: 5}, {note:'A#3', file:'a-3.mp3', b: 6},
+  {note:'C#4', file:'c-4.mp3', b: 8}, {note:'D#4', file:'d-4.mp3', b: 9},
+  {note:'F#4', file:'f-4.mp3', b: 11}, {note:'G#4', file:'g-4.mp3', b: 12}, {note:'A#4', file:'a-4.mp3', b: 13}
+];
+const ALL_KEYS = [];
+const piano = document.getElementById('piano');
+
+WHITE_KEYS.forEach(k => {
+  k.isBlack = false; k.idx = ALL_KEYS.length; ALL_KEYS.push(k);
+  const el = document.createElement('div');
+  el.className = 'white-key'; el.id = 'k' + k.idx;
+  el.innerHTML = `<span>${k.note}</span>`;
+  piano.appendChild(el);
+});
+
+BLACK_KEYS.forEach(k => {
+  k.isBlack = true; k.idx = ALL_KEYS.length; ALL_KEYS.push(k);
+  const el = document.createElement('div');
+  el.className = 'black-key'; el.id = 'k' + k.idx;
+  el.style.left = `calc((100vw / 14) * ${k.b})`;
+  el.innerHTML = `<span>${k.note}</span>`;
+  piano.appendChild(el);
+});
+
+let SENS = 55;
+let totalNotes = 0;
+let popTimer = null;
+const ac = {};
+function ga(f) { if (!ac[f]) ac[f] = new Audio('/tunes/' + f); return ac[f]; }
+ALL_KEYS.forEach(k => ga(k.file)); 
+
+const MAX_HANDS = 2;
+const HS = [
+  { smoothLm: null, pressFrames: 0, cooldown: false, activeKey: -1 },
+  { smoothLm: null, pressFrames: 0, cooldown: false, activeKey: -1 }
+];
+const HOV_CLASS = ['hov0', 'hov1'], PRS_CLASS = ['press0', 'press1'];
+const H_COLOR = ['#a855f7', '#06b6d4'];
+
+const video = document.getElementById('video');
+const canvas = document.getElementById('overlay');
+const ctx = canvas.getContext('2d');
+let videoW = 640, videoH = 480;
+
+video.addEventListener('loadedmetadata', () => {
+  videoW = video.videoWidth; videoH = video.videoHeight;
+});
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+
+async function startCamera() {
+  document.getElementById('startOv').classList.add('hidden');
+  document.getElementById('panel').style.display = 'flex';
+
+  const hands = new Hands({ locateFile: f => 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/' + f });
+  hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.55, minTrackingConfidence: 0.55 });
+  hands.onResults(onResults);
+
+  const cam = new Camera(video, {
+    onFrame: async () => { resize(); await hands.send({ image: video }); },
+    width: 800, height: 600
+  });
+  cam.start();
+}
+
+function d2(a, b) { return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2); }
+function getCurlRatio(lm) {
+  const TIP=lm[8], DIP=lm[7], PIP=lm[6], MCP=lm[5];
+  const len = d2(MCP,PIP) + d2(PIP,DIP) + d2(DIP,TIP);
+  if (len < 0.001) return 1;
+  return d2(TIP, MCP) / len;
+}
+function curlThr() { return 0.85 - (SENS - 20) * (0.40 / 70); }
+
+function smoothLandmarks(raw, hi) {
+  const s = HS[hi], SMOOTH = 0.45;
+  if (!s.smoothLm) { s.smoothLm = raw.map(l => ({x:l.x,y:l.y,z:l.z})); return s.smoothLm; }
+  s.smoothLm = raw.map((l, i) => ({
+    x: s.smoothLm[i].x * SMOOTH + l.x * (1-SMOOTH),
+    y: s.smoothLm[i].y * SMOOTH + l.y * (1-SMOOTH),
+    z: s.smoothLm[i].z * SMOOTH + l.z * (1-SMOOTH)
+  }));
+  return s.smoothLm;
+}
+
+function getScreenCoords(lx, ly) {
+  const sw = window.innerWidth, sh = window.innerHeight;
+  if (!videoW) return { x: lx, y: ly };
+  const vRatio = videoW / videoH, sRatio = sw / sh;
+  let rw, rh, ox = 0, oy = 0;
+  if (sRatio > vRatio) { rw = sw; rh = sw / vRatio; oy = (sh - rh) / 2; } 
+  else { rh = sh; rw = rh * vRatio; ox = (sw - rw) / 2; }
+  return { x: (ox + lx * rw) / sw, y: (oy + ly * rh) / sh };
+}
+
+function getHoveredKey(sx, sy) {
+  if (sy < 0.45) return -1;
+  const numWhite = 14, wWidth = 1 / numWhite, bWidth = 0.045;
+  if (sy < 0.85) {
+    for (let k of BLACK_KEYS) {
+      const center = k.b * wWidth;
+      if (sx > center - bWidth/2 && sx < center + bWidth/2) return k.idx;
+    }
+  }
+  const wIdx = Math.floor(sx * numWhite);
+  if (wIdx >= 0 && wIdx < numWhite) return WHITE_KEYS[wIdx].idx;
+  return -1;
+}
+
+function playNote(keyIdx, handIdx) {
+  const k = ALL_KEYS[keyIdx], a = ga(k.file);
+  a.currentTime = 0; a.play().catch(() => {});
+
+  const prev = HS[handIdx].activeKey;
+  if (prev >= 0) {
+    const pe = document.getElementById('k' + prev);
+    if (pe) pe.classList.remove(PRS_CLASS[handIdx], HOV_CLASS[handIdx]);
+  }
+  HS[handIdx].activeKey = keyIdx;
+  const ke = document.getElementById('k' + keyIdx);
+  if (ke) { ke.classList.remove(HOV_CLASS[handIdx]); ke.classList.add(PRS_CLASS[handIdx]); }
+
+  totalNotes++;
+  document.getElementById('totalNotes').textContent = totalNotes;
+
+  const p = document.getElementById('popup');
+  p.className = 'popup h' + handIdx;
+  p.textContent = '🎵 ' + k.note;
+  p.classList.add('show');
+  clearTimeout(popTimer);
+  popTimer = setTimeout(() => p.classList.remove('show'), 600);
+}
+
+function drawHand(screenLm, hi, pressing) {
+  const col = H_COLOR[hi];
+  const CONN = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
+  const sw = window.innerWidth, sh = window.innerHeight;
+  ctx.save();
+  ctx.strokeStyle = pressing ? '#ef4444' : col;
+  ctx.lineWidth = 3;
+  CONN.forEach(([a, b]) => {
+    ctx.beginPath(); ctx.moveTo(screenLm[a].x * sw, screenLm[a].y * sh); ctx.lineTo(screenLm[b].x * sw, screenLm[b].y * sh); ctx.stroke();
+  });
+  screenLm.forEach((l, i) => {
+    const x = l.x * sw, y = l.y * sh;
+    const isIdx = (i >= 5 && i <= 8);
+    ctx.beginPath(); ctx.arc(x, y, i === 8 ? 14 : isIdx ? 7 : 5, 0, Math.PI*2);
+    ctx.fillStyle = i === 8 ? (pressing ? '#ef4444' : col) : (isIdx ? col : col+'88');
+    ctx.fill();
+    if (i === 8) {
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.shadowColor = pressing ? '#ef4444' : col; ctx.shadowBlur = 20; ctx.fill(); ctx.shadowBlur = 0;
+    }
+  });
+  ctx.font = 'bold 16px Outfit,sans-serif'; ctx.fillStyle = col; ctx.shadowColor = '#000'; ctx.shadowBlur = 5;
+  ctx.fillText('H' + (hi+1), screenLm[0].x * sw - 10, screenLm[0].y * sh - 20);
+  ctx.restore();
+}
+
+function onResults(results) {
+  const sw = canvas.width, sh = canvas.height;
+  ctx.clearRect(0, 0, sw, sh);
+  const rawHands = results.multiHandLandmarks || [];
+  const handedness = results.multiHandedness || [];
+  document.getElementById('hCount').textContent = rawHands.length;
+
+  // Persist hand identity across frames using MediaPipe's handedness label
+  const activeIds = [];
+  for (let i = 0; i < rawHands.length; i++) {
+    const label = handedness[i] ? handedness[i].label : (i === 0 ? 'Left' : 'Right');
+    let hi = label === 'Left' ? 0 : 1;
+    if (activeIds.includes(hi)) hi = 1 - hi; // Fallback if both detected as same hand
+    activeIds.push(hi);
+  }
+
+  // Clear hands that are no longer active
+  for (let hi = 0; hi < MAX_HANDS; hi++) {
+    if (!activeIds.includes(hi)) {
+      const s = HS[hi];
+      if (s.smoothLm) {
+        s.smoothLm = null; s.pressFrames = 0;
+        document.querySelectorAll('.white-key, .black-key').forEach(k => k.classList.remove(HOV_CLASS[hi], PRS_CLASS[hi]));
+      }
+    }
+  }
+
+  for (let i = 0; i < Math.min(rawHands.length, MAX_HANDS); i++) {
+    const hi = activeIds[i];
+    const s = HS[hi], raw = rawHands[i];
+    const lm = smoothLandmarks(raw, hi).map(l => ({ x: 1-l.x, y: l.y, z: l.z }));
+    const curlRatio = getCurlRatio(lm);
+    const rawPress = curlRatio < curlThr();
+
+    s.pressFrames = rawPress ? Math.min(s.pressFrames + 1, 4) : Math.max(s.pressFrames - 1, 0);
+    const confirmed = s.pressFrames >= 2;
+
+    const screenLm = lm.map(l => getScreenCoords(l.x, l.y));
+    const tip = screenLm[8];
+    const keyIdx = getHoveredKey(tip.x, tip.y);
+
+    document.querySelectorAll('.white-key, .black-key').forEach((k) => {
+      if (!s.cooldown) {
+        const isHovered = (k.id === 'k' + keyIdx);
+        k.classList.toggle(HOV_CLASS[hi], isHovered && !confirmed);
+      }
+    });
+
+    if (confirmed && !s.cooldown && keyIdx >= 0) {
+      s.cooldown = true; s.pressFrames = 0; playNote(keyIdx, hi);
+      setTimeout(() => {
+        s.cooldown = false;
+        document.querySelectorAll('.white-key, .black-key').forEach(k => k.classList.remove(PRS_CLASS[hi], HOV_CLASS[hi]));
+        s.activeKey = -1;
+      }, 400);
+    }
+    drawHand(screenLm, hi, confirmed);
+  }
+}
+</script>
+</body>
+</html>

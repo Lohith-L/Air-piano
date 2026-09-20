@@ -7,9 +7,6 @@ Features:
 - **Real piano layout:** Includes black and white keys mapped to a realistic layout. Use the top half of the piano zone for black keys, and the bottom half for white keys.
 - **No GPU required:** Runs smoothly in the browser on a lightweight local Flask server.
 
-## Demo
-
-<img width="1917" height="916" alt="image" src="https://github.com/user-attachments/assets/befd6a10-e8c8-4c67-ace1-6ab525f01ba9" />
 
 
 

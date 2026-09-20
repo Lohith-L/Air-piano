@@ -10,7 +10,7 @@ Features:
 ## Demo
 
 <img width="1917" height="916" alt="image" src="https://github.com/user-attachments/assets/befd6a10-e8c8-4c67-ace1-6ab525f01ba9" />
-<img width="1917" height="916" alt="image" src="https://github.com/user-attachments/assets/ae9991be-a4d3-4bdc-b83c-5ad8eadbc81c" />
+
 
 
 
